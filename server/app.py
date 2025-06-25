@@ -18,8 +18,9 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 CORS(app)
 
-# Import models after db initialization
-from models import Event
+# Import and create models after db initialization
+from models import create_models
+Event = create_models(db)
 
 # Routes for Feature 1: Create and View Events
 @app.route('/events', methods=['GET'])
@@ -27,6 +28,11 @@ def get_events():
     """
     GET /events - Retrieve all events
     Returns: JSON array of all events with their details
+    
+    How it works:
+    1. Query all events from database using Event.query.all()
+    2. Convert each event to dictionary format for JSON response
+    3. Return as JSON array with HTTP 200 status
     """
     try:
         events = Event.query.all()
@@ -53,6 +59,14 @@ def create_event():
     POST /events - Create a new event
     Expected JSON body: {title, description, location, date}
     Returns: JSON of created event or validation errors
+    
+    How it works:
+    1. Get JSON data from request body
+    2. Validate required fields (title, date)
+    3. Parse and validate date format and ensure it's in future
+    4. Create new Event instance
+    5. Save to database using SQLAlchemy session
+    6. Return created event as JSON with HTTP 201 status
     """
     try:
         data = request.get_json()
@@ -104,7 +118,10 @@ def create_event():
 # Health check route
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Simple health check endpoint"""
+    """
+    Simple health check endpoint
+    Returns basic status to verify API is running
+    """
     return jsonify({'status': 'healthy', 'message': 'Event Planner API is running'}), 200
 
 if __name__ == '__main__':
