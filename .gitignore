@@ -1,0 +1,36 @@
+# === Python / Flask ===
+server/__pycache__/
+server/*.pyc
+server/*.pyo
+server/*.pyd
+server/env/
+server/venv/
+server/.env
+server/instance/
+server/migrations/
+server/.pytest_cache/
+server/.coverage
+server/coverage.xml
+
+# Flask SQLite DB (if using)
+server/app.db
+server/*.sqlite3
+
+# === Node / React (Vite) ===
+client/node_modules/
+client/.env
+client/dist/
+client/.vite/
+client/.DS_Store
+
+# === OS / Editor / Misc ===
+*.log
+*.swp
+*.swo
+*.bak
+*.tmp
+*.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.env
