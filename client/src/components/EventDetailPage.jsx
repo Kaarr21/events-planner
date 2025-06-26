@@ -1,23 +1,25 @@
 import { useState, useEffect } from 'react';
+import RSVPForm from './RSVPForm';
 import './EventDetailPage.css';
 
 /**
  * EventDetailPage Component
  * 
- * This component displays detailed information about a single event.
- * It fetches event data from the backend API and displays it in a formatted layout.
+ * This component displays detailed information about a single event with RSVP functionality.
+ * It fetches event data from the backend API and allows users to RSVP to the event.
  * 
  * Props:
  * - eventId: The ID of the event to display (will come from URL params in a real router setup)
  * 
  * How it works:
- * 1. Uses useState to manage event data and loading states
+ * 1. Uses useState to manage event data, loading states, and RSVP display
  * 2. Uses useEffect to fetch event data when component mounts or eventId changes
  * 3. Makes HTTP GET request to /events/{id} endpoint
  * 4. Displays loading state while fetching
  * 5. Shows error message if event not found or fetch fails
  * 6. Renders event details in a structured layout
- * 7. Includes placeholder links for future RSVP and Task features
+ * 7. Includes working RSVP form and RSVP summary display
+ * 8. Fetches and displays current RSVPs for the event
  */
 
 function EventDetailPage({ eventId }) {
@@ -25,6 +27,9 @@ function EventDetailPage({ eventId }) {
   const [event, setEvent] = useState(null);          // Stores the event data
   const [loading, setLoading] = useState(true);      // Tracks if data is being loaded
   const [error, setError] = useState(null);          // Stores any error messages
+  const [showRSVPForm, setShowRSVPForm] = useState(false); // Controls RSVP form visibility
+  const [rsvps, setRsvps] = useState([]);            // Stores RSVP data
+  const [rsvpLoading, setRsvpLoading] = useState(false); // Tracks RSVP loading state
 
   // useEffect hook runs when component mounts or when eventId changes
   useEffect(() => {
@@ -70,6 +75,44 @@ function EventDetailPage({ eventId }) {
       // Always set loading to false, whether success or error
       setLoading(false);
     }
+  };
+
+  /**
+   * Fetch RSVPs for the current event
+   */
+  const fetchEventRSVPs = async () => {
+    try {
+      setRsvpLoading(true);
+      const response = await fetch(`http://localhost:5000/events/${eventId}/rsvps`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setRsvps(data.rsvps || []);
+      }
+    } catch (error) {
+      console.error('Error fetching RSVPs:', error);
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
+  /**
+   * Handle successful RSVP submission
+   */
+  const handleRSVPSuccess = (newRsvp) => {
+    // Refresh event data to get updated RSVP summary
+    fetchEvent();
+    // Refresh RSVP list
+    fetchEventRSVPs();
+    // Hide the form
+    setShowRSVPForm(false);
+  };
+
+  /**
+   * Handle RSVP update (when user submits RSVP)
+   */
+  const handleRSVPUpdate = () => {
+    fetchEventRSVPs();
   };
 
   /**
