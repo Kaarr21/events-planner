@@ -115,6 +115,53 @@ def create_event():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# Routes for Feature 2: View Single Event
+@app.route('/events/<int:event_id>', methods=['GET'])
+def get_single_event(event_id):
+    """
+    GET /events/<int:id> - Retrieve a single event by ID
+    URL Parameters: event_id (integer) - The ID of the event to retrieve
+    Returns: JSON object of the event or 404 if not found
+    
+    How it works:
+    1. Use event_id from URL parameter (Flask automatically converts <int:event_id> to integer)
+    2. Query database for event with specific ID using Event.query.get(event_id)
+    3. Event.query.get() returns None if no event found with that ID
+    4. If event exists, convert to dictionary and return as JSON with 200 status
+    5. If event doesn't exist, return 404 error with descriptive message
+    
+    URL Examples:
+    - GET /events/1 -> Returns event with ID 1
+    - GET /events/999 -> Returns 404 if no event with ID 999
+    """
+    try:
+        # Query for specific event by ID
+        # get() method returns the instance or None if not found
+        event = Event.query.get(event_id)
+        
+        # Check if event exists
+        if not event:
+            return jsonify({
+                'error': f'Event with ID {event_id} not found'
+            }), 404
+        
+        # Convert event to dictionary and return
+        event_data = {
+            'id': event.id,
+            'title': event.title,
+            'description': event.description,
+            'location': event.location,
+            'date': event.date.isoformat() if event.date else None,
+            'created_at': event.created_at.isoformat() if event.created_at else None,
+            'updated_at': event.updated_at.isoformat() if event.updated_at else None
+        }
+        
+        return jsonify(event_data), 200
+    
+    except Exception as e:
+        # Handle any unexpected errors (like database connection issues)
+        return jsonify({'error': str(e)}), 500
+
 # Health check route
 @app.route('/health', methods=['GET'])
 def health_check():
