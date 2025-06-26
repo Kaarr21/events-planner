@@ -261,6 +261,162 @@
     }
   }
   
+  /* RSVP Summary Styles */
+  .rsvp-summary {
+    padding: 2rem;
+    border-bottom: 1px solid #eee;
+    background: #f8f9fa;
+  }
+  
+  .rsvp-summary h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #333;
+    font-size: 1.3rem;
+    font-weight: 600;
+  }
+  
+  .rsvp-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+  }
+  
+  .stat-item {
+    text-align: center;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .stat-item.total {
+    background: #646cff;
+    color: white;
+  }
+  
+  .stat-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+  
+  .stat-label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+  }
+  
+  /* RSVP List Styles */
+  .rsvps-list {
+    padding: 2rem;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .rsvps-list h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: #333;
+    font-size: 1.3rem;
+    font-weight: 600;
+  }
+  
+  .rsvps-container {
+    display: grid;
+    gap: 1rem;
+  }
+  
+  .rsvp-item {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  .rsvp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .guest-name {
+    font-weight: 600;
+    color: #333;
+    font-size: 1.1rem;
+  }
+  
+  .rsvp-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+  
+  .rsvp-status.yes {
+    background: #d4edda;
+    color: #155724;
+  }
+  
+  .rsvp-status.no {
+    background: #f8d7da;
+    color: #721c24;
+  }
+  
+  .rsvp-status.maybe {
+    background: #fff3cd;
+    color: #856404;
+  }
+  
+  .guest-email {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .guest-note {
+    background: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .rsvp-date {
+    color: #999;
+    font-size: 0.8rem;
+  }
+  
+  /* View RSVPs Button */
+  .view-rsvps-button:not(:disabled) {
+    border-color: #6f42c1;
+    color: #6f42c1;
+  }
+  
+  .view-rsvps-button:not(:disabled):hover {
+    background: #e7e3ff;
+  }
+  
+  /* Task Buttons */
+  .tasks-button:not(:disabled) {
+    border-color: #17a2b8;
+    color: #17a2b8;
+  }
+  
+  .tasks-button:not(:disabled):hover {
+    background: #d1ecf1;
+  }
+  
+  .view-tasks-button:not(:disabled) {
+    border-color: #fd7e14;
+    color: #fd7e14;
+  }
+  
+  .view-tasks-button:not(:disabled):hover {
+    background: #fef3e2;
+  }
+  
   /* Dark mode support */
   @media (prefers-color-scheme: dark) {
     .event-detail-container {
@@ -270,7 +426,9 @@
     
     .event-description h3,
     .event-actions h3,
-    .event-details h3 {
+    .event-details h3,
+    .rsvp-summary h3,
+    .rsvps-list h3 {
       color: #fff;
     }
     
@@ -278,9 +436,17 @@
       color: #ccc;
     }
     
-    .detail-item {
+    .detail-item,
+    .rsvp-item,
+    .stat-item {
       background: #2d2d2d;
       color: #fff;
+      border-color: #404040;
+    }
+    
+    .stat-item.total {
+      background: #646cff;
+      color: white;
     }
     
     .detail-item strong {
@@ -291,6 +457,112 @@
       background: #2d2d2d;
       border-color: #404040;
       color: #fff;
+    }
+    
+    .rsvp-summary {
+      background: #2d2d2d;
+    }
+    
+    .guest-name {
+      color: #fff;
+    }
+    
+  .guest-note {
+      background: #404040;
+    }
+  }
+  
+  /* Edit and Delete Event Buttons */
+  .edit-event-button {
+    background-color: #ffc107;
+    color: #212529;
+    border: 2px solid #ffc107;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    margin-right: 1rem;
+  }
+  
+  .edit-event-button:hover {
+    background-color: #e0a800;
+    border-color: #e0a800;
+    transform: translateY(-1px);
+  }
+  
+  .cancel-edit-button {
+    background-color: #6c757d;
+    color: white;
+    border: 2px solid #6c757d;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    margin-right: 1rem;
+  }
+  
+  .cancel-edit-button:hover {
+    background-color: #5a6268;
+    border-color: #5a6268;
+    transform: translateY(-1px);
+  }
+  
+  .delete-event-button {
+    background-color: #dc3545;
+    color: white;
+    border: 2px solid #dc3545;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  
+  .delete-event-button:hover {
+    background-color: #c82333;
+    border-color: #c82333;
+    transform: translateY(-1px);
+  }
+  
+  .delete-event-button:disabled {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+  }
+  
+  .event-management-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+  
+  .edit-form-container {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-top: 1rem;
+  }
+  
+  @media (max-width: 768px) {
+    .event-management-buttons {
+      flex-direction: column;
+    }
+    
+    .edit-event-button,
+    .cancel-edit-button,
+    .delete-event-button {
+      width: 100%;
+      margin-right: 0;
+      margin-bottom: 0.5rem;
     }
   }
   

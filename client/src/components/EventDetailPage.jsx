@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import RSVPForm from './RSVPForm';
+import TaskList from './TaskList';
+import NewTaskForm from './NewTaskForm';
+import EditEventForm from './EditEventForm';
 import './EventDetailPage.css';
 
 /**
@@ -30,6 +33,12 @@ function EventDetailPage({ eventId }) {
   const [showRSVPForm, setShowRSVPForm] = useState(false); // Controls RSVP form visibility
   const [rsvps, setRsvps] = useState([]);            // Stores RSVP data
   const [rsvpLoading, setRsvpLoading] = useState(false); // Tracks RSVP loading state
+  const [showTaskForm, setShowTaskForm] = useState(false); // Controls Task form visibility
+  const [tasks, setTasks] = useState([]);            // Stores task data
+  const [taskSummary, setTaskSummary] = useState(null); // Stores task summary
+  const [taskLoading, setTaskLoading] = useState(false); // Tracks task loading state
+  const [showEditForm, setShowEditForm] = useState(false); // Controls Edit Event form visibility
+  const [deleteLoading, setDeleteLoading] = useState(false); // Tracks delete loading state
 
   // useEffect hook runs when component mounts or when eventId changes
   useEffect(() => {
@@ -116,6 +125,97 @@ function EventDetailPage({ eventId }) {
   };
 
   /**
+   * Fetch Tasks for the current event
+   */
+  const fetchEventTasks = async () => {
+    try {
+      setTaskLoading(true);
+      const response = await fetch(`http://localhost:5000/events/${eventId}/tasks`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTasks(data.tasks || []);
+        setTaskSummary(data.task_summary || null);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    } finally {
+      setTaskLoading(false);
+    }
+  };
+
+  /**
+   * Handle successful task creation
+   */
+  const handleTaskCreated = (newTask) => {
+    // Refresh task list
+    fetchEventTasks();
+    // Hide the form
+    setShowTaskForm(false);
+  };
+
+  /**
+   * Handle task update (when user toggles completion or updates task)
+   */
+  const handleTaskUpdate = () => {
+    fetchEventTasks();
+  };
+
+  /**
+   * Handle task toggle (when user marks task as complete/incomplete)
+   */
+  const handleTaskToggle = (updatedTask) => {
+    // Update the task in the local state
+    setTasks(prevTasks => 
+      prevTasks.map(task => 
+        task.id === updatedTask.id ? updatedTask : task
+      )
+    );
+    // Also refresh the summary
+    fetchEventTasks();
+  };
+
+  /**
+   * Handle successful event update
+   */
+  const handleEventUpdate = (updatedEvent) => {
+    // Update the event in the local state
+    setEvent(updatedEvent);
+    // Hide the edit form
+    setShowEditForm(false);
+  };
+
+  /**
+   * Handle event deletion
+   */
+  const handleDeleteEvent = async () => {
+    if (!window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setDeleteLoading(true);
+      const response = await fetch(`http://localhost:5000/events/${eventId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        alert('Event deleted successfully!');
+        // Navigate back to events list
+        window.history.back();
+      } else {
+        const errorData = await response.json();
+        alert(`Error deleting event: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      alert('Error deleting event. Please try again.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  /**
    * Format date string for display
    * Converts ISO date string to readable format
    */
@@ -189,23 +289,157 @@ function EventDetailPage({ eventId }) {
           <p>{event.description || 'No description provided'}</p>
         </div>
 
+        {/* RSVP Summary Section */}
+        {event.rsvp_summary && (
+          <div className="rsvp-summary">
+            <h3>RSVP Summary</h3>
+            <div className="rsvp-stats">
+              <div className="stat-item">
+                <span className="stat-value">{event.rsvp_summary.yes}</span>
+                <span className="stat-label">✅ Yes</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">{event.rsvp_summary.no}</span>
+                <span className="stat-label">❌ No</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">{event.rsvp_summary.maybe}</span>
+                <span className="stat-label">🤔 Maybe</span>
+              </div>
+              <div className="stat-item total">
+                <span className="stat-value">{event.rsvp_summary.total}</span>
+                <span className="stat-label">Total RSVPs</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons Section */}
         <div className="event-actions">
           <h3>Event Actions</h3>
           <div className="action-buttons">
-            {/* RSVP Button - placeholder for Feature 3 */}
-            <button className="action-button rsvp-button" disabled>
-              📝 RSVP to Event
-              <span className="coming-soon">(Coming Soon)</span>
+            {/* RSVP Button - Feature 3 Implementation */}
+            <button 
+              className="action-button rsvp-button"
+              onClick={() => setShowRSVPForm(!showRSVPForm)}
+            >
+              📝 {showRSVPForm ? 'Hide RSVP Form' : 'RSVP to Event'}
             </button>
             
-            {/* Task List Button - placeholder for Feature 4 */}
-            <button className="action-button tasks-button" disabled>
-              ✅ View Tasks
-              <span className="coming-soon">(Coming Soon)</span>
+            {/* View RSVPs Button */}
+            <button 
+              className="action-button view-rsvps-button"
+              onClick={fetchEventRSVPs}
+              disabled={rsvpLoading}
+            >
+              👥 {rsvpLoading ? 'Loading...' : 'View RSVPs'}
+            </button>
+            
+            {/* Create Task Button - Feature 4 Implementation */}
+            <button 
+              className="action-button tasks-button"
+              onClick={() => setShowTaskForm(!showTaskForm)}
+            >
+              📝 {showTaskForm ? 'Hide Task Form' : 'Create Task'}
+            </button>
+            
+            {/* View Tasks Button */}
+            <button 
+              className="action-button view-tasks-button"
+              onClick={fetchEventTasks}
+              disabled={taskLoading}
+            >
+              📋 {taskLoading ? 'Loading...' : 'View Tasks'}
+            </button>
+
+            {/* Edit Event Button - Feature 6 Implementation */}
+            <button 
+              className="action-button edit-event-button"
+              onClick={() => setShowEditForm(!showEditForm)}
+            >
+              ✏️ {showEditForm ? 'Cancel Edit' : 'Edit Event'}
+            </button>
+
+            {/* Delete Event Button - Feature 6 Implementation */}
+            <button 
+              className="action-button delete-event-button"
+              onClick={handleDeleteEvent}
+              disabled={deleteLoading}
+              style={{ backgroundColor: '#dc3545', borderColor: '#dc3545' }}
+            >
+              🗑️ {deleteLoading ? 'Deleting...' : 'Delete Event'}
             </button>
           </div>
         </div>
+
+        {/* RSVP Form Section */}
+        {showRSVPForm && (
+          <RSVPForm 
+            eventId={eventId}
+            onRSVPSuccess={handleRSVPSuccess}
+            onRSVPUpdate={handleRSVPUpdate}
+          />
+        )}
+
+        {/* RSVPs List Section */}
+        {rsvps.length > 0 && (
+          <div className="rsvps-list">
+            <h3>Event RSVPs ({rsvps.length})</h3>
+            <div className="rsvps-container">
+              {rsvps.map((rsvp) => (
+                <div key={rsvp.id} className="rsvp-item">
+                  <div className="rsvp-header">
+                    <span className="guest-name">{rsvp.guest_name}</span>
+                    <span className={`rsvp-status ${rsvp.rsvp_status.toLowerCase()}`}>
+                      {rsvp.rsvp_status === 'Yes' && '✅'}
+                      {rsvp.rsvp_status === 'No' && '❌'}
+                      {rsvp.rsvp_status === 'Maybe' && '🤔'}
+                      {rsvp.rsvp_status}
+                    </span>
+                  </div>
+                  <div className="guest-email">{rsvp.guest_email}</div>
+                  {rsvp.note_to_host && (
+                    <div className="guest-note">
+                      <strong>Note:</strong> {rsvp.note_to_host}
+                    </div>
+                  )}
+                  <div className="rsvp-date">
+                    RSVP'd on {formatDate(rsvp.created_at)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Edit Event Form Section - Feature 6 Implementation */}
+        {showEditForm && (
+          <EditEventForm 
+            eventId={eventId}
+            onEventUpdate={handleEventUpdate}
+            onCancel={() => setShowEditForm(false)}
+          />
+        )}
+
+        {/* Task Form Section */}
+        {showTaskForm && (
+          <NewTaskForm 
+            eventId={eventId}
+            onTaskCreated={handleTaskCreated}
+            onCancel={() => setShowTaskForm(false)}
+          />
+        )}
+
+        {/* Tasks List Section */}
+        {(tasks.length > 0 || taskSummary) && (
+          <TaskList 
+            tasks={tasks}
+            taskSummary={taskSummary}
+            onTaskToggle={handleTaskToggle}
+            onTaskUpdate={handleTaskUpdate}
+            loading={taskLoading}
+          />
+        )}
 
         {/* Event Details Section */}
         <div className="event-details">

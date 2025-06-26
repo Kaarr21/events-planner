@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 class Event:
     """
@@ -29,11 +29,11 @@ def create_models(db):
         title = db.Column(db.String(200), nullable=False)
         description = db.Column(db.Text, default='')
         location = db.Column(db.String(300), default='')
-        date = db.Column(db.DateTime, nullable=False)
+        date = db.Column(db.DateTime(timezone=True), nullable=False)
         
         # Metadata
-        created_at = db.Column(db.DateTime, default=datetime.utcnow)
-        updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+        updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
         
         # Relationship to RSVPs
         rsvps = db.relationship('EventGuest', backref='event', lazy=True, cascade='all, delete-orphan')
@@ -97,8 +97,8 @@ def create_models(db):
         note_to_host = db.Column(db.Text, default='')
         
         # Metadata
-        created_at = db.Column(db.DateTime, default=datetime.utcnow)
-        updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+        updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
         
         # Unique constraint to prevent duplicate RSVPs from same email for same event
         __table_args__ = (
@@ -176,4 +176,123 @@ def create_models(db):
             db.session.delete(self)
             db.session.commit()
     
-    return Event, EventGuest
+    class Task(db.Model):
+        """
+        Task model - represents a task associated with an event
+        This model handles to-do items for event planning
+        """
+        __tablename__ = 'tasks'
+        
+        # Primary key
+        id = db.Column(db.Integer, primary_key=True)
+        
+        # Foreign key to Event
+        event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
+        
+        # Task details
+        description = db.Column(db.Text, nullable=False)
+        completed = db.Column(db.Boolean, default=False, nullable=False)
+        
+        # Optional fields
+        assigned_to = db.Column(db.String(100), default='')  # Who is responsible
+        due_date = db.Column(db.DateTime(timezone=True))  # Optional due date
+        priority = db.Column(db.String(10), default='Medium')  # High, Medium, Low
+        
+        # Metadata
+        created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+        updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+        
+        def __init__(self, event_id, description, completed=False, assigned_to='', due_date=None, priority='Medium'):
+            """
+            Initialize a new Task instance
+            
+            Args:
+                event_id (int): ID of the associated event
+                description (str): Task description
+                completed (bool, optional): Whether task is completed. Defaults to False.
+                assigned_to (str, optional): Person assigned to task. Defaults to ''.
+                due_date (datetime, optional): Due date for task. Defaults to None.
+                priority (str, optional): Task priority. Defaults to 'Medium'.
+            """
+            self.event_id = event_id
+            self.description = description
+            self.completed = completed
+            self.assigned_to = assigned_to
+            self.due_date = due_date
+            self.priority = priority
+        
+        def __repr__(self):
+            """String representation for debugging"""
+            status = "✅" if self.completed else "❌"
+            return f'<Task {self.id}: {status} {self.description[:50]}... for Event {self.event_id}>'
+        
+        def to_dict(self):
+            """Convert Task instance to dictionary for JSON serialization"""
+            return {
+                'id': self.id,
+                'event_id': self.event_id,
+                'description': self.description,
+                'completed': self.completed,
+                'assigned_to': self.assigned_to,
+                'due_date': self.due_date.isoformat() if self.due_date else None,
+                'priority': self.priority,
+                'created_at': self.created_at.isoformat() if self.created_at else None,
+                'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            }
+        
+        @classmethod
+        def get_tasks_for_event(cls, event_id):
+            """
+            Get all tasks for a specific event
+            
+            Args:
+                event_id (int): Event ID
+                
+            Returns:
+                list: List of Task instances
+            """
+            return cls.query.filter_by(event_id=event_id).order_by(cls.created_at.desc()).all()
+        
+        @classmethod
+        def get_completed_tasks_for_event(cls, event_id):
+            """
+            Get completed tasks for a specific event
+            
+            Args:
+                event_id (int): Event ID
+                
+            Returns:
+                list: List of completed Task instances
+            """
+            return cls.query.filter_by(event_id=event_id, completed=True).all()
+        
+        @classmethod
+        def get_pending_tasks_for_event(cls, event_id):
+            """
+            Get pending (not completed) tasks for a specific event
+            
+            Args:
+                event_id (int): Event ID
+                
+            Returns:
+                list: List of pending Task instances
+            """
+            return cls.query.filter_by(event_id=event_id, completed=False).all()
+        
+        def save(self):
+            """Save the current task to database"""
+            db.session.add(self)
+            db.session.commit()
+        
+        def delete(self):
+            """Delete the current task from database"""
+            db.session.delete(self)
+            db.session.commit()
+        
+        def toggle_completion(self):
+            """Toggle the completion status of the task"""
+            self.completed = not self.completed
+            self.updated_at = datetime.now(timezone.utc)
+            db.session.commit()
+    
+    return Event, EventGuest, Task
