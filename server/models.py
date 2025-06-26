@@ -296,3 +296,4 @@ def create_models(db):
             db.session.commit()
     
     return Event, EventGuest, Task
+
