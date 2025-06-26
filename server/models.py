@@ -6,6 +6,12 @@ class Event:
     """
     pass
 
+class EventGuest:
+    """
+    EventGuest model - this is a base class that will be converted to SQLAlchemy model
+    """
+    pass
+
 def create_models(db):
     """
     Create SQLAlchemy models with the database instance
@@ -29,16 +35,11 @@ def create_models(db):
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
         updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
         
+        # Relationship to RSVPs
+        rsvps = db.relationship('EventGuest', backref='event', lazy=True, cascade='all, delete-orphan')
+        
         def __init__(self, title, description='', location='', date=None):
-            """
-            Initialize a new Event instance
-            
-            Args:
-                title (str): The event title
-                description (str, optional): Event description
-                location (str, optional): Event location
-                date (datetime): Event date and time
-            """
+            """Initialize a new Event instance"""
             self.title = title
             self.description = description
             self.location = location
@@ -49,12 +50,7 @@ def create_models(db):
             return f'<Event {self.id}: {self.title} on {self.date}>'
         
         def to_dict(self):
-            """
-            Convert Event instance to dictionary for JSON serialization
-            
-            Returns:
-                dict: Dictionary representation of the event
-            """
+            """Convert Event instance to dictionary for JSON serialization"""
             return {
                 'id': self.id,
                 'title': self.title,
@@ -65,38 +61,119 @@ def create_models(db):
                 'updated_at': self.updated_at.isoformat() if self.updated_at else None
             }
         
-        @classmethod
-        def get_all_events(cls):
-            """
-            Class method to get all events
+        def get_rsvp_summary(self):
+            """Get RSVP summary for this event"""
+            yes_count = len([r for r in self.rsvps if r.rsvp_status == 'Yes'])
+            no_count = len([r for r in self.rsvps if r.rsvp_status == 'No'])
+            maybe_count = len([r for r in self.rsvps if r.rsvp_status == 'Maybe'])
             
-            Returns:
-                list: List of all Event instances
-            """
-            return cls.query.all()
+            return {
+                'total': len(self.rsvps),
+                'yes': yes_count,
+                'no': no_count,
+                'maybe': maybe_count
+            }
+    
+    class EventGuest(db.Model):
+        """
+        EventGuest model - represents an RSVP to an event
+        This is an association model that connects events with guest responses
+        """
+        __tablename__ = 'event_guests'
         
-        @classmethod
-        def get_event_by_id(cls, event_id):
+        # Primary key
+        id = db.Column(db.Integer, primary_key=True)
+        
+        # Foreign key to Event
+        event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
+        
+        # Guest information (for now, we'll use simple fields)
+        # In a real app with authentication, this would be user_id
+        guest_name = db.Column(db.String(100), nullable=False)
+        guest_email = db.Column(db.String(200), nullable=False)
+        
+        # RSVP details
+        rsvp_status = db.Column(db.String(10), nullable=False)  # 'Yes', 'No', 'Maybe'
+        note_to_host = db.Column(db.Text, default='')
+        
+        # Metadata
+        created_at = db.Column(db.DateTime, default=datetime.utcnow)
+        updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+        
+        # Unique constraint to prevent duplicate RSVPs from same email for same event
+        __table_args__ = (
+            db.UniqueConstraint('event_id', 'guest_email', name='unique_event_guest_email'),
+        )
+        
+        def __init__(self, event_id, guest_name, guest_email, rsvp_status, note_to_host=''):
             """
-            Get event by ID
+            Initialize a new EventGuest (RSVP) instance
             
             Args:
-                event_id (int): The event ID
+                event_id (int): ID of the event
+                guest_name (str): Name of the guest
+                guest_email (str): Email of the guest
+                rsvp_status (str): 'Yes', 'No', or 'Maybe'
+                note_to_host (str, optional): Optional note to the host
+            """
+            self.event_id = event_id
+            self.guest_name = guest_name
+            self.guest_email = guest_email
+            self.rsvp_status = rsvp_status
+            self.note_to_host = note_to_host
+        
+        def __repr__(self):
+            """String representation for debugging"""
+            return f'<EventGuest {self.guest_name} - {self.rsvp_status} for Event {self.event_id}>'
+        
+        def to_dict(self):
+            """Convert EventGuest instance to dictionary for JSON serialization"""
+            return {
+                'id': self.id,
+                'event_id': self.event_id,
+                'guest_name': self.guest_name,
+                'guest_email': self.guest_email,
+                'rsvp_status': self.rsvp_status,
+                'note_to_host': self.note_to_host,
+                'created_at': self.created_at.isoformat() if self.created_at else None,
+                'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            }
+        
+        @classmethod
+        def get_rsvp_by_email_and_event(cls, event_id, guest_email):
+            """
+            Get existing RSVP for a guest at a specific event
+            
+            Args:
+                event_id (int): Event ID
+                guest_email (str): Guest email
                 
             Returns:
-                Event or None: Event instance if found, None otherwise
+                EventGuest or None: Existing RSVP if found
             """
-            return cls.query.get(event_id)
+            return cls.query.filter_by(event_id=event_id, guest_email=guest_email).first()
+        
+        @classmethod
+        def get_rsvps_for_event(cls, event_id):
+            """
+            Get all RSVPs for a specific event
+            
+            Args:
+                event_id (int): Event ID
+                
+            Returns:
+                list: List of EventGuest instances
+            """
+            return cls.query.filter_by(event_id=event_id).all()
         
         def save(self):
-            """Save the current event to database"""
+            """Save the current RSVP to database"""
             db.session.add(self)
             db.session.commit()
         
         def delete(self):
-            """Delete the current event from database"""
+            """Delete the current RSVP from database"""
             db.session.delete(self)
             db.session.commit()
     
-    return Event
-    
+    return Event, EventGuest

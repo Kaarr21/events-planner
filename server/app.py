@@ -4,6 +4,7 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from datetime import datetime
 import os
+import re
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -20,33 +21,31 @@ CORS(app)
 
 # Import and create models after db initialization
 from models import create_models
-Event = create_models(db)
+Event, EventGuest = create_models(db)
+
+# Validation helper functions
+def validate_email(email):
+    """Simple email validation"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def validate_rsvp_status(status):
+    """Validate RSVP status"""
+    return status in ['Yes', 'No', 'Maybe']
 
 # Routes for Feature 1: Create and View Events
 @app.route('/events', methods=['GET'])
 def get_events():
-    """
-    GET /events - Retrieve all events
-    Returns: JSON array of all events with their details
-    
-    How it works:
-    1. Query all events from database using Event.query.all()
-    2. Convert each event to dictionary format for JSON response
-    3. Return as JSON array with HTTP 200 status
-    """
+    """GET /events - Retrieve all events"""
     try:
         events = Event.query.all()
         events_data = []
         
         for event in events:
-            events_data.append({
-                'id': event.id,
-                'title': event.title,
-                'description': event.description,
-                'location': event.location,
-                'date': event.date.isoformat() if event.date else None,
-                'created_at': event.created_at.isoformat() if event.created_at else None
-            })
+            event_dict = event.to_dict()
+            # Add RSVP summary to each event
+            event_dict['rsvp_summary'] = event.get_rsvp_summary()
+            events_data.append(event_dict)
         
         return jsonify(events_data), 200
     
@@ -55,19 +54,7 @@ def get_events():
 
 @app.route('/events', methods=['POST'])
 def create_event():
-    """
-    POST /events - Create a new event
-    Expected JSON body: {title, description, location, date}
-    Returns: JSON of created event or validation errors
-    
-    How it works:
-    1. Get JSON data from request body
-    2. Validate required fields (title, date)
-    3. Parse and validate date format and ensure it's in future
-    4. Create new Event instance
-    5. Save to database using SQLAlchemy session
-    6. Return created event as JSON with HTTP 201 status
-    """
+    """POST /events - Create a new event"""
     try:
         data = request.get_json()
         
@@ -102,14 +89,7 @@ def create_event():
         db.session.commit()
         
         # Return created event
-        return jsonify({
-            'id': new_event.id,
-            'title': new_event.title,
-            'description': new_event.description,
-            'location': new_event.location,
-            'date': new_event.date.isoformat(),
-            'created_at': new_event.created_at.isoformat()
-        }), 201
+        return jsonify(new_event.to_dict()), 201
     
     except Exception as e:
         db.session.rollback()
@@ -118,57 +98,153 @@ def create_event():
 # Routes for Feature 2: View Single Event
 @app.route('/events/<int:event_id>', methods=['GET'])
 def get_single_event(event_id):
-    """
-    GET /events/<int:id> - Retrieve a single event by ID
-    URL Parameters: event_id (integer) - The ID of the event to retrieve
-    Returns: JSON object of the event or 404 if not found
-    
-    How it works:
-    1. Use event_id from URL parameter (Flask automatically converts <int:event_id> to integer)
-    2. Query database for event with specific ID using Event.query.get(event_id)
-    3. Event.query.get() returns None if no event found with that ID
-    4. If event exists, convert to dictionary and return as JSON with 200 status
-    5. If event doesn't exist, return 404 error with descriptive message
-    
-    URL Examples:
-    - GET /events/1 -> Returns event with ID 1
-    - GET /events/999 -> Returns 404 if no event with ID 999
-    """
+    """GET /events/<int:id> - Retrieve a single event by ID"""
     try:
-        # Query for specific event by ID
-        # get() method returns the instance or None if not found
         event = Event.query.get(event_id)
         
-        # Check if event exists
         if not event:
-            return jsonify({
-                'error': f'Event with ID {event_id} not found'
-            }), 404
+            return jsonify({'error': f'Event with ID {event_id} not found'}), 404
         
-        # Convert event to dictionary and return
-        event_data = {
-            'id': event.id,
-            'title': event.title,
-            'description': event.description,
-            'location': event.location,
-            'date': event.date.isoformat() if event.date else None,
-            'created_at': event.created_at.isoformat() if event.created_at else None,
-            'updated_at': event.updated_at.isoformat() if event.updated_at else None
-        }
+        event_data = event.to_dict()
+        # Add RSVP summary to single event view
+        event_data['rsvp_summary'] = event.get_rsvp_summary()
         
         return jsonify(event_data), 200
     
     except Exception as e:
-        # Handle any unexpected errors (like database connection issues)
+        return jsonify({'error': str(e)}), 500
+
+# Routes for Feature 3: RSVP to Events
+@app.route('/rsvps', methods=['POST'])
+def create_rsvp():
+    """
+    POST /rsvps - Create a new RSVP for an event
+    Expected JSON: {event_id, guest_name, guest_email, rsvp_status, note_to_host}
+    """
+    try:
+        data = request.get_json()
+        
+        # Validation
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Required fields validation
+        required_fields = ['event_id', 'guest_name', 'guest_email', 'rsvp_status']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        # Validate event exists
+        event = Event.query.get(data['event_id'])
+        if not event:
+            return jsonify({'error': 'Event not found'}), 404
+        
+        # Validate email format
+        if not validate_email(data['guest_email']):
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        # Validate RSVP status
+        if not validate_rsvp_status(data['rsvp_status']):
+            return jsonify({'error': 'RSVP status must be Yes, No, or Maybe'}), 400
+        
+        # Check if RSVP already exists for this email and event
+        existing_rsvp = EventGuest.get_rsvp_by_email_and_event(
+            data['event_id'], 
+            data['guest_email']
+        )
+        
+        if existing_rsvp:
+            return jsonify({
+                'error': 'RSVP already exists for this email and event',
+                'existing_rsvp_id': existing_rsvp.id
+            }), 409
+        
+        # Create new RSVP
+        new_rsvp = EventGuest(
+            event_id=data['event_id'],
+            guest_name=data['guest_name'].strip(),
+            guest_email=data['guest_email'].lower().strip(),
+            rsvp_status=data['rsvp_status'],
+            note_to_host=data.get('note_to_host', '').strip()
+        )
+        
+        db.session.add(new_rsvp)
+        db.session.commit()
+        
+        return jsonify(new_rsvp.to_dict()), 201
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/rsvps/<int:rsvp_id>', methods=['PATCH'])
+def update_rsvp(rsvp_id):
+    """
+    PATCH /rsvps/<id> - Update an existing RSVP
+    Expected JSON: {rsvp_status, note_to_host} (all optional)
+    """
+    try:
+        rsvp = EventGuest.query.get(rsvp_id)
+        
+        if not rsvp:
+            return jsonify({'error': 'RSVP not found'}), 404
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Update fields if provided
+        if 'rsvp_status' in data:
+            if not validate_rsvp_status(data['rsvp_status']):
+                return jsonify({'error': 'RSVP status must be Yes, No, or Maybe'}), 400
+            rsvp.rsvp_status = data['rsvp_status']
+        
+        if 'note_to_host' in data:
+            rsvp.note_to_host = data['note_to_host'].strip()
+        
+        # Update timestamp
+        rsvp.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify(rsvp.to_dict()), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/events/<int:event_id>/rsvps', methods=['GET'])
+def get_event_rsvps(event_id):
+    """
+    GET /events/<id>/rsvps - Get all RSVPs for a specific event
+    """
+    try:
+        # Verify event exists
+        event = Event.query.get(event_id)
+        if not event:
+            return jsonify({'error': 'Event not found'}), 404
+        
+        # Get all RSVPs for this event
+        rsvps = EventGuest.get_rsvps_for_event(event_id)
+        
+        rsvps_data = []
+        for rsvp in rsvps:
+            rsvps_data.append(rsvp.to_dict())
+        
+        return jsonify({
+            'event_id': event_id,
+            'event_title': event.title,
+            'rsvp_summary': event.get_rsvp_summary(),
+            'rsvps': rsvps_data
+        }), 200
+    
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 # Health check route
 @app.route('/health', methods=['GET'])
 def health_check():
-    """
-    Simple health check endpoint
-    Returns basic status to verify API is running
-    """
+    """Simple health check endpoint"""
     return jsonify({'status': 'healthy', 'message': 'Event Planner API is running'}), 200
 
 if __name__ == '__main__':
